@@ -1,6 +1,6 @@
 const SUPABASE_URL = 'https://xqjacybkimctqntemqed.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_oMyepXsQ1YIUSxl95c2nqg_JhgyvjMG';
-const CLAUDE_API_KEY = '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';
+const CLAUDE_API_KEY = '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';
 
 // --- SUPABASE HELPERS ---
 async function saveItems(items, store) {
@@ -39,10 +39,12 @@ async function loadHistory() {
 async function scanReceipt(base64Image, mimeType) {
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': CLAUDE_API_KEY,
-      'anthropic-version': '2023-06-01'
+  headers: {
+  'Content-Type': 'application/json',
+  'x-api-key': CLAUDE_API_KEY,
+  'anthropic-version': '2023-06-01',
+  'anthropic-dangerous-allow-browser': 'true'
+},
     },
     body: JSON.stringify({
       model: 'claude-opus-4-5',
