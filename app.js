@@ -56,8 +56,8 @@ async function scanReceipt(base64Image, mimeType) {
   const data = await response.json();
   if (data.error) throw new Error(data.error);
   const text = data.content[0].text;
-const cleaned = text.replace(/`/g, '').replace(/json/g, '').trim();
-return JSON.parse(cleaned);
+  const cleaned = text.replace(/`/g, '').replace(/json/g, '').trim();
+  return JSON.parse(cleaned);
 }
 
 // --- UI ---
@@ -119,6 +119,40 @@ function displayResults(items, store) {
   }).join('');
 }
 
+// --- CHART ---
+let chart = null;
+
+function updateChart(items) {
+  const categories = {};
+  items.forEach(item => {
+    categories[item.category] = (categories[item.category] || 0) + Number(item.price);
+  });
+
+  const labels = Object.keys(categories);
+  const values = Object.values(categories);
+
+  if (chart) chart.destroy();
+
+  const ctx = document.getElementById('spendingChart').getContext('2d');
+  chart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Spending ($)',
+        data: values,
+        backgroundColor: '#1a1a2e'
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } }
+    }
+  });
+}
+
+// --- HISTORY ---
 async function refreshHistory() {
   const items = await loadHistory();
   const historyEl = document.getElementById('history');
@@ -126,6 +160,7 @@ async function refreshHistory() {
     historyEl.innerHTML = '<p style="color:#888">No scans yet.</p>';
     return;
   }
+  updateChart(items);
   historyEl.innerHTML = items.map(function(item) {
     return '<div class="item-card"><div><div class="item-name">' + item.item_name + '</div><div class="item-meta">' + item.store + ' - ' + item.category + ' - ' + new Date(item.scanned_at).toLocaleDateString() + '</div></div><div style="display:flex;align-items:center;gap:8px;"><div class="item-price">$' + Number(item.price).toFixed(2) + '</div><button class="delete-btn" onclick="handleDelete(' + item.id + ')">Delete</button></div></div>';
   }).join('');
