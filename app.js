@@ -56,7 +56,7 @@ async function scanReceipt(base64Image, mimeType) {
   const data = await response.json();
   if (data.error) throw new Error(data.error);
   const text = data.content[0].text;
-const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+const cleaned = text.replace(/`/g, '').replace(/json/g, '').trim();
 return JSON.parse(cleaned);
 }
 
