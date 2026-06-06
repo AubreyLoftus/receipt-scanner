@@ -54,6 +54,7 @@ async function scanReceipt(base64Image, mimeType) {
   });
 
   const data = await response.json();
+  if (data.error) throw new Error(data.error);
   const text = data.content[0].text;
   return JSON.parse(text);
 }
