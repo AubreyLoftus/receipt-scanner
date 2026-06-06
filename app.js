@@ -1,6 +1,6 @@
 // --- CONFIGURATION ---
 const SUPABASE_URL = 'https://xqjacybkimctqntemqed.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_oMyepXsQ1YIUSxl95c2nqg_JhgyvjMG';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhxamFjeWJraW1jdHFudGVtcWVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxODA5MjIsImV4cCI6MjA5NTc1NjkyMn0.lh_zhRtpyoVeMt1YK5HBLVM04FDpROGQXBWLIAqz8UM';
 
 // --- SUPABASE HELPERS ---
 async function saveItems(items, store) {
