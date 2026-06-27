@@ -156,6 +156,9 @@ scanBtn.addEventListener('click', async () => {
     await refreshHistory();
   } catch (err) {
     status.textContent = 'Error: ' + err.message;
+    status.textContent = 'Error: ' + err.message;
+console.log('Scan error detail:', err);
+results.innerHTML = '<div style="background:#fff0f0;padding:12px;border-radius:8px;color:#c00;font-size:0.85rem;margin-top:8px;"><strong>Debug info:</strong><br>' + err.message + '</div>';
   } finally {
     scanBtn.disabled = false;
   }
