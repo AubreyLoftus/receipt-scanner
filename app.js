@@ -2,6 +2,26 @@
 const SUPABASE_URL = 'https://xqjacybkimctqntemqed.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhxamFjeWJraW1jdHFudGVtcWVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxODA5MjIsImV4cCI6MjA5NTc1NjkyMn0.lh_zhRtpyoVeMt1YK5HBLVM04FDpROGQXBWLIAqz8UM';
 
+// --- CATEGORY COLORS ---
+// Each category always gets the same color, even across different scans
+const CATEGORY_COLORS = {
+  'Groceries':             '#2a9d8f',
+  'Snacks & Drinks':       '#e9c46a',
+  'Household':             '#264653',
+  'Personal Care':         '#a8dadc',
+  'Clothing':              '#e63946',
+  'Electronics':           '#457b9d',
+  'Kids & School':         '#f4a261',
+  'Dining & Prepared Food':'#6d6875',
+  'Pet':                   '#b5838d',
+  'Entertainment':         '#c77dff',
+  'Other':                 '#aaaaaa'
+};
+
+function colorForCategory(cat) {
+  return CATEGORY_COLORS[cat] || '#aaaaaa';
+}
+
 // --- SUPABASE HELPERS ---
 async function saveItems(items, store) {
   const rows = items.map(item => ({
@@ -26,7 +46,7 @@ async function saveItems(items, store) {
 
 async function loadHistory() {
   const response = await fetch(
-    `${SUPABASE_URL}/rest/v1/receipts?order=scanned_at.desc&limit=50`, {
+    `${SUPABASE_URL}/rest/v1/receipts?order=scanned_at.desc&limit=200`, {
     headers: {
       'apikey': SUPABASE_KEY,
       'Authorization': `Bearer ${SUPABASE_KEY}`
@@ -55,9 +75,19 @@ async function scanReceipt(base64Image, mimeType) {
 
   const data = await response.json();
   if (data.error) throw new Error(data.error);
-  const text = data.content[0].text;
-  const cleaned = text.replace(/`/g, '').replace(/json/g, '').trim();
-  return JSON.parse(cleaned);
+
+  // Safely extract the text from Claude's response
+  const text = data.content && data.content[0] && data.content[0].text;
+  if (!text) throw new Error('No response text from Claude');
+
+  // Remove markdown code fences if present (```json ... ``` or ``` ... ```)
+  const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+  try {
+    return JSON.parse(cleaned);
+  } catch (e) {
+    throw new Error('Could not parse receipt data. Try a clearer photo.');
+  }
 }
 
 // --- UI ---
@@ -115,7 +145,17 @@ function toBase64(file) {
 
 function displayResults(items, store) {
   results.innerHTML = '<h2>' + store + '</h2>' + items.map(function(item) {
-    return '<div class="item-card"><div><div class="item-name">' + item.name + '</div><div class="item-meta">' + item.category + '</div></div><div class="item-price">$' + Number(item.price).toFixed(2) + '</div></div>';
+    const color = colorForCategory(item.category);
+    return `<div class="item-card">
+      <div>
+        <div class="item-name">${item.name}</div>
+        <div class="item-meta">
+          <span class="category-dot" style="background:${color}"></span>
+          ${item.category}
+        </div>
+      </div>
+      <div class="item-price">$${Number(item.price).toFixed(2)}</div>
+    </div>`;
   }).join('');
 }
 
@@ -123,13 +163,18 @@ function displayResults(items, store) {
 let chart = null;
 
 function updateChart(items) {
+  // Sum spending by category
   const categories = {};
   items.forEach(item => {
-    categories[item.category] = (categories[item.category] || 0) + Number(item.price);
+    const cat = item.category || 'Other';
+    categories[cat] = (categories[cat] || 0) + Number(item.price);
   });
 
-  const labels = Object.keys(categories);
-  const values = Object.values(categories);
+  // Sort by spending, highest first
+  const sorted = Object.entries(categories).sort((a, b) => b[1] - a[1]);
+  const labels = sorted.map(e => e[0]);
+  const values = sorted.map(e => parseFloat(e[1].toFixed(2)));
+  const colors = labels.map(colorForCategory);
 
   if (chart) chart.destroy();
 
@@ -141,13 +186,34 @@ function updateChart(items) {
       datasets: [{
         label: 'Spending ($)',
         data: values,
-        backgroundColor: '#1a1a2e'
+        backgroundColor: colors,
+        borderRadius: 6
       }]
     },
     options: {
       responsive: true,
-      plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true } }
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ' $' + ctx.parsed.y.toFixed(2)
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            callback: val => '$' + val
+          }
+        },
+        x: {
+          ticks: {
+            maxRotation: 35,
+            font: { size: 11 }
+          }
+        }
+      }
     }
   });
 }
@@ -162,7 +228,20 @@ async function refreshHistory() {
   }
   updateChart(items);
   historyEl.innerHTML = items.map(function(item) {
-    return '<div class="item-card"><div><div class="item-name">' + item.item_name + '</div><div class="item-meta">' + item.store + ' - ' + item.category + ' - ' + new Date(item.scanned_at).toLocaleDateString() + '</div></div><div style="display:flex;align-items:center;gap:8px;"><div class="item-price">$' + Number(item.price).toFixed(2) + '</div><button class="delete-btn" onclick="handleDelete(' + item.id + ')">Delete</button></div></div>';
+    const color = colorForCategory(item.category);
+    return `<div class="item-card">
+      <div>
+        <div class="item-name">${item.item_name}</div>
+        <div class="item-meta">
+          <span class="category-dot" style="background:${color}"></span>
+          ${item.store} · ${item.category} · ${new Date(item.scanned_at).toLocaleDateString()}
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="item-price">$${Number(item.price).toFixed(2)}</div>
+        <button class="delete-btn" onclick="handleDelete(${item.id})">✕</button>
+      </div>
+    </div>`;
   }).join('');
 }
 
