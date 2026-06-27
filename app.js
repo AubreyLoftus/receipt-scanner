@@ -3,23 +3,48 @@ const SUPABASE_URL = 'https://xqjacybkimctqntemqed.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhxamFjeWJraW1jdHFudGVtcWVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxODA5MjIsImV4cCI6MjA5NTc1NjkyMn0.lh_zhRtpyoVeMt1YK5HBLVM04FDpROGQXBWLIAqz8UM';
 
 // --- CATEGORY COLORS ---
-// Each category always gets the same color, even across different scans
 const CATEGORY_COLORS = {
-  'Groceries':             '#2a9d8f',
-  'Snacks & Drinks':       '#e9c46a',
-  'Household':             '#264653',
-  'Personal Care':         '#a8dadc',
-  'Clothing':              '#e63946',
-  'Electronics':           '#457b9d',
-  'Kids & School':         '#f4a261',
-  'Dining & Prepared Food':'#6d6875',
-  'Pet':                   '#b5838d',
-  'Entertainment':         '#c77dff',
-  'Other':                 '#aaaaaa'
+  'Groceries':          '#2a9d8f',
+  'Snacks & Drinks':    '#e9c46a',
+  'Household':          '#264653',
+  'Personal Care':      '#a8dadc',
+  'Clothing':           '#e63946',
+  'Electronics':        '#457b9d',
+  'Kids & School':      '#f4a261',
+  'Dining Out':         '#6d6875',
+  'Coffee & Treats':    '#c77dff',
+  'Gas & Auto':         '#e76f51',
+  'Utilities & Bills':  '#219ebc',
+  'Pet':                '#b5838d',
+  'Entertainment':      '#52b788',
+  'Gifts':              '#f72585',
+  'Other':              '#aaaaaa'
 };
 
 function colorForCategory(cat) {
   return CATEGORY_COLORS[cat] || '#aaaaaa';
+}
+
+// --- MANUAL CATEGORY OVERRIDE ---
+let manualCategory = null;
+
+function setupCategoryButtons() {
+  const buttons = document.querySelectorAll('.cat-btn');
+  buttons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.classList.contains('active')) {
+        btn.classList.remove('active');
+        manualCategory = null;
+        document.getElementById('categoryNote').textContent = 'Auto-detecting categories';
+      } else {
+        buttons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        manualCategory = btn.dataset.category;
+        document.getElementById('categoryNote').textContent =
+          'Will log as: ' + manualCategory + ' (total only)';
+      }
+    });
+  });
 }
 
 // --- SUPABASE HELPERS ---
@@ -70,17 +95,19 @@ async function scanReceipt(base64Image, mimeType) {
   const response = await fetch('/.netlify/functions/scan-receipt', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ image: base64Image, mimeType: mimeType })
+    body: JSON.stringify({
+      image: base64Image,
+      mimeType: mimeType,
+      manualCategory: manualCategory
+    })
   });
 
   const data = await response.json();
   if (data.error) throw new Error(data.error);
 
-  // Safely extract the text from Claude's response
   const text = data.content && data.content[0] && data.content[0].text;
   if (!text) throw new Error('No response text from Claude');
 
-  // Remove markdown code fences if present (```json ... ``` or ``` ... ```)
   const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
 
   try {
@@ -123,7 +150,7 @@ scanBtn.addEventListener('click', async () => {
     const mimeType = file.type;
     const parsed = await scanReceipt(base64, mimeType);
 
-    status.textContent = 'Found ' + parsed.items.length + ' items at ' + parsed.store;
+    status.textContent = 'Found ' + parsed.items.length + ' item(s) at ' + parsed.store;
     displayResults(parsed.items, parsed.store);
     await saveItems(parsed.items, parsed.store);
     await refreshHistory();
@@ -163,14 +190,12 @@ function displayResults(items, store) {
 let chart = null;
 
 function updateChart(items) {
-  // Sum spending by category
   const categories = {};
   items.forEach(item => {
     const cat = item.category || 'Other';
     categories[cat] = (categories[cat] || 0) + Number(item.price);
   });
 
-  // Sort by spending, highest first
   const sorted = Object.entries(categories).sort((a, b) => b[1] - a[1]);
   const labels = sorted.map(e => e[0]);
   const values = sorted.map(e => parseFloat(e[1].toFixed(2)));
@@ -203,15 +228,10 @@ function updateChart(items) {
       scales: {
         y: {
           beginAtZero: true,
-          ticks: {
-            callback: val => '$' + val
-          }
+          ticks: { callback: val => '$' + val }
         },
         x: {
-          ticks: {
-            maxRotation: 35,
-            font: { size: 11 }
-          }
+          ticks: { maxRotation: 35, font: { size: 11 } }
         }
       }
     }
@@ -252,4 +272,6 @@ async function handleDelete(id) {
   }
 }
 
+// --- INIT ---
+setupCategoryButtons();
 refreshHistory();
