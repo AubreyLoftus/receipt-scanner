@@ -90,7 +90,7 @@ async function deleteItem(id) {
   });
 }
 
-// --- CLAUDE API (via Netlify Function) ---
+// --- CLAUDE API (via Cloudflare Worker) ---
 async function scanReceipt(base64Image, mimeType) {
   const response = await fetch('https://receipt-scanner.loftusaubrey.workers.dev', {
     method: 'POST',
@@ -105,9 +105,11 @@ async function scanReceipt(base64Image, mimeType) {
   const data = await response.json();
   if (data.error) throw new Error(data.error);
 
+  // Safely extract the text from Claude's response
   const text = data.content && data.content[0] && data.content[0].text;
   if (!text) throw new Error('No response text from Claude');
 
+  // Remove markdown code fences if present
   const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
 
   try {
@@ -156,9 +158,7 @@ scanBtn.addEventListener('click', async () => {
     await refreshHistory();
   } catch (err) {
     status.textContent = 'Error: ' + err.message;
-    status.textContent = 'Error: ' + err.message;
-console.log('Scan error detail:', err);
-results.innerHTML = '<div style="background:#fff0f0;padding:12px;border-radius:8px;color:#c00;font-size:0.85rem;margin-top:8px;"><strong>Debug info:</strong><br>' + err.message + '</div>';
+    results.innerHTML = '<div style="background:#fff0f0;padding:12px;border-radius:8px;color:#c00;font-size:0.85rem;margin-top:8px;"><strong>Debug info:</strong><br>' + err.message + '</div>';
   } finally {
     scanBtn.disabled = false;
   }
