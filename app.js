@@ -92,7 +92,7 @@ async function deleteItem(id) {
 
 // --- CLAUDE API (via Netlify Function) ---
 async function scanReceipt(base64Image, mimeType) {
-  const response = await fetch('/.netlify/functions/scan-receipt', {
+  const response = await fetch('https://receipt-scanner.loftusaubrey.workers.dev', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
